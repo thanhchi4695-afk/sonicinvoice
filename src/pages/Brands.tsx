@@ -174,26 +174,42 @@ export default function Brands() {
     }
   }
 
-  async function seedAndCrawl(b: { name: string; domain: string; vertical: Vertical }) {
-    const id = await ensureSeedRow(b.name, b.domain);
+  async function seedAndCrawl(b: { name: string; domain: string; vertical: Vertical; tier?: 1 | 2 }) {
+    const id = await ensureSeedRow(b.name, b.domain, b.tier, b.vertical);
     if (id) await crawl(b.name, b.domain, id, b.vertical);
   }
 
   async function crawlAllPriority1(storeFilter?: "Splash" | "Stomp") {
-    const targets = PRIORITY_BRANDS.filter(
-      (b) => b.tier === 1 && (!storeFilter || b.store === storeFilter)
+    const allP1 = PRIORITY_BRANDS.filter((b) => b.tier === 1 && (!storeFilter || b.store === storeFilter));
+    // Skip brands already completed (per spec)
+    const completedNames = new Set(
+      rows.filter((r) => r.crawl_status === "completed" || r.crawl_status === "crawled").map((r) => r.brand_name.toLowerCase())
     );
-    if (targets.length === 0) return;
+    const targets = allP1.filter((b) => !completedNames.has(b.name.toLowerCase()));
+    if (targets.length === 0) {
+      toast.info(`All ${storeFilter ?? ""} Priority 1 brands already completed.`);
+      return;
+    }
     const label = storeFilter ? `${storeFilter} Priority 1` : "All Priority 1";
-    if (!confirm(`Crawl ${targets.length} ${label} brands sequentially? This may take several minutes.`)) return;
+    if (!confirm(`Crawl ${targets.length} ${label} brands sequentially (~${targets.length * 8} Firecrawl credits)? This may take several minutes.`)) return;
+    await runBatch(label, targets);
+  }
 
+  async function crawlAll() {
+    const targets = PRIORITY_BRANDS;
+    const estCredits = targets.length * 8;
+    if (!confirm(`This will use approximately ${estCredits} Firecrawl credits. Continue?`)) return;
+    await runBatch("All brands", targets);
+  }
+
+  async function runBatch(label: string, targets: typeof PRIORITY_BRANDS) {
     setBatchProgress({ done: 0, total: targets.length, current: targets[0].name });
     let ok = 0, fail = 0;
     for (let i = 0; i < targets.length; i++) {
       const b = targets[i];
       setBatchProgress({ done: i, total: targets.length, current: b.name });
       try {
-        const id = await ensureSeedRow(b.name, b.domain);
+        const id = await ensureSeedRow(b.name, b.domain, b.tier, b.vertical);
         if (!id) { fail++; continue; }
         const { data, error } = await supabase.functions.invoke("brand-intelligence-crawler", {
           body: { brand_id: id, brand_name: b.name, brand_domain: b.domain, industry_vertical: b.vertical },

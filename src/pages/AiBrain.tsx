@@ -177,24 +177,65 @@ export default function AiBrain() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Automated test hypotheses</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldCheck className="w-4 h-4" /> Awaiting your approval
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            High-confidence hypotheses never deploy automatically. Review the proposed change, then approve or reject — every action is recorded in the audit log below.
+          </p>
         </CardHeader>
         <CardContent>
-          {hypotheses.length === 0 && <p className="text-sm text-muted-foreground">No hypotheses yet.</p>}
+          {hypotheses.filter(h => h.status === "awaiting_approval").length === 0 && (
+            <p className="text-sm text-muted-foreground">No tests waiting for approval.</p>
+          )}
           <div className="space-y-2">
-            {hypotheses.map(h => (
+            {hypotheses.filter(h => h.status === "awaiting_approval").map(h => (
+              <div key={h.id} className="border border-primary/40 bg-primary/5 rounded p-3 text-sm">
+                <div className="flex justify-between items-start gap-2 mb-2">
+                  <div className="flex-1">
+                    <div className="font-medium">{h.target_label ?? h.target_id}</div>
+                    <div className="text-xs text-muted-foreground mb-1">{h.hypothesis_type}</div>
+                    {h.current_value && <div className="text-xs"><span className="text-muted-foreground">Current:</span> <code className="text-[11px]">{h.current_value}</code></div>}
+                    {h.proposed_value && <div className="text-xs mt-1"><span className="text-muted-foreground">Propose:</span> <code className="text-[11px]">{h.proposed_value}</code></div>}
+                    {h.reasoning && <div className="text-xs text-muted-foreground mt-1">{h.reasoning}</div>}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-xs">conf {(h.confidence * 100).toFixed(0)}%</div>
+                    <div className="text-xs text-emerald-600">+{Number(h.expected_impact_pct).toFixed(0)}%</div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => respond(h.id, "approve")} disabled={acting === h.id}>
+                    <Check className="w-3.5 h-3.5 mr-1" /> Approve & deploy
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => respond(h.id, "reject")} disabled={acting === h.id}>
+                    <X className="w-3.5 h-3.5 mr-1" /> Reject
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">All hypotheses & deployed tests</CardTitle></CardHeader>
+        <CardContent>
+          {hypotheses.filter(h => h.status !== "awaiting_approval").length === 0 && (
+            <p className="text-sm text-muted-foreground">No other hypotheses yet.</p>
+          )}
+          <div className="space-y-2">
+            {hypotheses.filter(h => h.status !== "awaiting_approval").map(h => (
               <div key={h.id} className="border border-border rounded p-3 text-sm">
                 <div className="flex justify-between items-start gap-2">
                   <div className="flex-1">
                     <div className="font-medium">{h.target_label ?? h.target_id}</div>
                     <div className="text-xs text-muted-foreground mb-1">{h.hypothesis_type}</div>
                     {h.proposed_value && <div className="text-xs"><span className="text-muted-foreground">Propose:</span> {h.proposed_value}</div>}
-                    {h.reasoning && <div className="text-xs text-muted-foreground mt-1">{h.reasoning}</div>}
                   </div>
                   <div className="text-right shrink-0">
-                    <Badge variant={h.auto_created ? "default" : "outline"}>{h.status}</Badge>
+                    <Badge variant={h.status === "testing" ? "default" : h.status === "rejected" ? "destructive" : "outline"}>{h.status}</Badge>
                     <div className="text-xs mt-1">conf {(h.confidence * 100).toFixed(0)}%</div>
-                    <div className="text-xs text-emerald-600">+{Number(h.expected_impact_pct).toFixed(0)}%</div>
                   </div>
                 </div>
               </div>

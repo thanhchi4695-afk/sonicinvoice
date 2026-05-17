@@ -168,6 +168,18 @@ export const EnrichProductButton = ({
     setPending(null);
   };
 
+  const statusIcon =
+    status === "searching" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
+    status === "found" ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" aria-label="Found" /> :
+    status === "failed" ? <AlertTriangle className="w-3.5 h-3.5 text-amber-500" aria-label="Not found" /> :
+    <Sparkles className="w-3.5 h-3.5" />;
+
+  const statusLabel =
+    status === "searching" ? "Searching…" :
+    status === "found" ? "Enriched" :
+    status === "failed" ? "Not found" :
+    "Enrich from Web";
+
   return (
     <>
       <Button
@@ -178,13 +190,10 @@ export const EnrichProductButton = ({
         disabled={loading}
         className={className}
         title="Search supplier and web for product details"
+        aria-label={`Enrich product status: ${statusLabel}`}
       >
-        {loading ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        ) : (
-          <Sparkles className="w-3.5 h-3.5" />
-        )}
-        {loading ? "Enriching…" : "Enrich from Web"}
+        {statusIcon}
+        {statusLabel}
       </Button>
 
       <AlertDialog open={!!pending} onOpenChange={(o) => !o && setPending(null)}>

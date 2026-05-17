@@ -99,8 +99,9 @@ export default function CompleteFlowSection() {
           <div className="font-mono text-[10px] uppercase tracking-[0.07em] text-lime mb-3">
             GROWTH TOOLS
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
             {[
+              { icon: "🤖", headline: "14 flows. Every night.", body: "The Sonic AI Agent processes invoices, checks stock, monitors margins, and fixes SEO while you sleep.", hash: "ai-agent" },
               { icon: "🔎", headline: "From page 3 to page 1", body: "AI writes every collection title, meta, description, and FAQ. Automatically.", hash: "seo-tools" },
               { icon: "📣", headline: "2.8x real ROAS", body: "Margin-aware bidding. No vanity metrics. Spend that actually pays.", hash: "ads-setup" },
               { icon: "✅", headline: "234 disapprovals → 0", body: "AI fixes every gender, age_group, and colour error. One click.", hash: "google-feed" },

@@ -36,6 +36,7 @@ const OPERATIONS: Video[] = [
 ];
 
 const GROWTH: Video[] = [
+  { src: "/videos/video-ai-agent.html", title: "AI Agent — Your Store On Autopilot", caption: "14 automated flows running overnight — invoice processing, restock checks, margin protection, and SEO. Powered by Claude.", slug: "ai-agent" },
   { src: "/videos/sonic_seo_tools.html", title: "SEO Writer + Collection SEO", caption: "From invisible on Google to 14/22 collections optimised — automatically", slug: "seo-tools" },
   { src: "/videos/sonic_competitor_tools.html", title: "Competitor Intel + Price Monitor", caption: "See what competitors charge. Match in one click. Find gaps worth 2,400 searches/month.", slug: "competitor-tools" },
   { src: "/videos/sonic_ads_setup.html", title: "Google + Meta Ads Setup", caption: "Margin-aware bidding. 2.8x real ROAS. $380/month wasted spend eliminated.", slug: "ads-setup" },
@@ -122,7 +123,7 @@ export default function HowItWorks() {
     <div className="bg-[#0a0a0a] min-h-screen text-[#f5f5f5]">
       <RouteSeo
         title="How It Works — Sonic Invoices"
-        description="32 animated explainers — see how Sonic Invoices handles intake, operations, growth, SEO, ads, and AI agents across all 58 features."
+        description="33 animated explainers — see how Sonic Invoices handles intake, operations, growth, SEO, ads, and the live AI Agent across all 58 features."
         path="/how-it-works"
       />
       <LandingNavigation />
@@ -141,10 +142,10 @@ export default function HowItWorks() {
               lineHeight: 1.05,
             }}
           >
-            32 ways Sonic works for your store
+            33 ways Sonic works for your store
           </h1>
           <p className="text-base text-[#a3a3a3] max-w-[640px] mx-auto mt-5">
-            32 animated explainers + 6 interactive workflows — every feature covered
+            The complete animated library — every feature, every workflow, all 58 functions + the live AI Agent
           </p>
         </div>
       </section>

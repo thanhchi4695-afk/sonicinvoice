@@ -123,7 +123,7 @@ export default function HowItWorks() {
     <div className="bg-[#0a0a0a] min-h-screen text-[#f5f5f5]">
       <RouteSeo
         title="How It Works — Sonic Invoices"
-        description="32 animated explainers — see how Sonic Invoices handles intake, operations, growth, SEO, ads, and AI agents across all 58 features."
+        description="33 animated explainers — see how Sonic Invoices handles intake, operations, growth, SEO, ads, and the live AI Agent across all 58 features."
         path="/how-it-works"
       />
       <LandingNavigation />
@@ -142,10 +142,10 @@ export default function HowItWorks() {
               lineHeight: 1.05,
             }}
           >
-            32 ways Sonic works for your store
+            33 ways Sonic works for your store
           </h1>
           <p className="text-base text-[#a3a3a3] max-w-[640px] mx-auto mt-5">
-            32 animated explainers + 6 interactive workflows — every feature covered
+            The complete animated library — every feature, every workflow, all 58 functions + the live AI Agent
           </p>
         </div>
       </section>

@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Brain, Loader2, Sparkles, AlertTriangle, TrendingUp } from "lucide-react";
+import { Brain, Loader2, Sparkles, AlertTriangle, TrendingUp, Check, X, ShieldCheck, History } from "lucide-react";
 
 type Weight = { metric_name: string; weight: number; sample_size: number };
 type Hypothesis = {
@@ -25,6 +25,10 @@ type RunLog = {
   signals_collected: number; conflicts_resolved: number;
   hypotheses_generated: number; auto_tests_created: number; error_message: string | null;
 };
+type AuditRow = {
+  id: string; hypothesis_id: string; action: string; actor: string;
+  reason: string | null; snapshot: any; created_at: string;
+};
 
 const METRIC_LABELS: Record<string, string> = {
   ctr: "CTR (search clicks)",
@@ -40,6 +44,8 @@ export default function AiBrain() {
   const [hypotheses, setHypotheses] = useState<Hypothesis[]>([]);
   const [resolutions, setResolutions] = useState<Resolution[]>([]);
   const [runs, setRuns] = useState<RunLog[]>([]);
+  const [audit, setAudit] = useState<AuditRow[]>([]);
+  const [acting, setActing] = useState<string | null>(null);
   const [settings, setSettings] = useState({
     autonomous_enabled: false,
     max_concurrent_auto_tests: 3,
@@ -53,19 +59,37 @@ export default function AiBrain() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoading(false); return; }
-    const [w, h, r, l, s] = await Promise.all([
+    const [w, h, r, l, s, a] = await Promise.all([
       supabase.from("business_impact_weights").select("*").eq("user_id", user.id),
       supabase.from("auto_test_hypotheses").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
       supabase.from("cross_loop_resolutions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
       supabase.from("cross_loop_run_log").select("*").eq("user_id", user.id).order("started_at", { ascending: false }).limit(10),
       supabase.from("ai_brain_settings").select("*").eq("user_id", user.id).maybeSingle(),
+      supabase.from("auto_test_audit").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
     ]);
     setWeights((w.data ?? []) as Weight[]);
     setHypotheses((h.data ?? []) as Hypothesis[]);
     setResolutions((r.data ?? []) as Resolution[]);
     setRuns((l.data ?? []) as RunLog[]);
+    setAudit((a.data ?? []) as AuditRow[]);
     if (s.data) setSettings({ ...settings, ...s.data });
     setLoading(false);
+  };
+
+  const respond = async (hypothesisId: string, action: "approve" | "reject") => {
+    setActing(hypothesisId);
+    try {
+      let reason: string | null = null;
+      if (action === "reject") reason = window.prompt("Reason for rejecting (optional)?") ?? null;
+      const { error } = await supabase.functions.invoke("ai-brain-approve", {
+        body: { hypothesis_id: hypothesisId, action, reason },
+      });
+      if (error) throw error;
+      toast({ title: action === "approve" ? "Approved — deploying test" : "Rejected" });
+      await load();
+    } catch (e: any) {
+      toast({ title: "Action failed", description: e?.message, variant: "destructive" });
+    } finally { setActing(null); }
   };
 
   useEffect(() => { load(); }, []);

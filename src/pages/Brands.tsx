@@ -65,6 +65,13 @@ interface BrandRow {
   manually_verified: boolean;
   iconic_reference?: any;
   whitefox_reference?: any;
+  // New spec fields
+  priority: number | null;
+  needs_manual_review: boolean | null;
+  size_range: string | null;
+  key_fabric_technologies: string[] | null;
+  price_range_aud: { min?: number; max?: number } | null;
+  collections_created: number | null;
 }
 
 export default function Brands() {

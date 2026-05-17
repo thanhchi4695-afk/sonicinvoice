@@ -669,24 +669,42 @@ export default function Brands() {
                   {selected.pages_fetched ?? 0} pages •
                   Last crawled: {selected.last_crawled_at ? new Date(selected.last_crawled_at).toLocaleString() : "never"}
                 </div>
-                <div className="flex gap-2 pt-2">
-                  <Button onClick={() => crawl(selected.brand_name, selected.brand_domain, selected.id)} disabled={crawlingId === selected.id}>
-                    {crawlingId === selected.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
-                    Re-crawl
-                  </Button>
-                  {selected.industry_vertical === "FOOTWEAR" && (
-                    <Button variant="secondary" onClick={() => refreshIconic(selected.id, selected.brand_name)} disabled={iconicRefreshingId === selected.id}>
-                      {iconicRefreshingId === selected.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
-                      Refresh ICONIC
+                {editMode ? (
+                  <div className="border-t pt-3 space-y-2">
+                    <div className="text-xs uppercase text-muted-foreground">Edit manually</div>
+                    <Input placeholder="Brand tone" value={editDraft.brand_tone ?? ""} onChange={(e) => setEditDraft({ ...editDraft, brand_tone: e.target.value })} />
+                    <Input placeholder="Brand tone sample" value={editDraft.brand_tone_sample ?? ""} onChange={(e) => setEditDraft({ ...editDraft, brand_tone_sample: e.target.value })} />
+                    <Input placeholder="Collection structure (silhouette | print | function | mixed)" value={editDraft.collection_structure_type ?? ""} onChange={(e) => setEditDraft({ ...editDraft, collection_structure_type: e.target.value })} />
+                    <Input placeholder="Primary SEO keyword" value={editDraft.seo_primary_keyword ?? ""} onChange={(e) => setEditDraft({ ...editDraft, seo_primary_keyword: e.target.value })} />
+                    <Input placeholder="Size range (e.g. XS-3XL)" value={editDraft.size_range ?? ""} onChange={(e) => setEditDraft({ ...editDraft, size_range: e.target.value })} />
+                    <div className="flex gap-2 pt-1">
+                      <Button onClick={saveEdit} disabled={savingEdit}>
+                        {savingEdit && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Save
+                      </Button>
+                      <Button variant="ghost" onClick={() => setEditMode(false)}>Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2 pt-2 flex-wrap">
+                    <Button onClick={() => crawl(selected.brand_name, selected.brand_domain, selected.id)} disabled={crawlingId === selected.id}>
+                      {crawlingId === selected.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+                      Re-crawl
                     </Button>
-                  )}
-                  <Button variant="outline" onClick={() => toggleVerified(selected)}>
-                    {selected.manually_verified ? "Unverify" : "Mark verified"}
-                  </Button>
-                  <Button variant="ghost" className="text-destructive ml-auto" onClick={() => { removeBrand(selected); setSelected(null); }}>
-                    Remove
-                  </Button>
-                </div>
+                    <Button variant="secondary" onClick={() => startEdit(selected)}>Edit manually</Button>
+                    {selected.industry_vertical === "FOOTWEAR" && (
+                      <Button variant="secondary" onClick={() => refreshIconic(selected.id, selected.brand_name)} disabled={iconicRefreshingId === selected.id}>
+                        {iconicRefreshingId === selected.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
+                        Refresh ICONIC
+                      </Button>
+                    )}
+                    <Button variant="outline" onClick={() => toggleVerified(selected)}>
+                      {selected.manually_verified ? "Unverify" : "Mark verified"}
+                    </Button>
+                    <Button variant="ghost" className="text-destructive ml-auto" onClick={() => { removeBrand(selected); setSelected(null); }}>
+                      Remove
+                    </Button>
+                  </div>
+                )}
                 {selected.iconic_reference && (
                   <div className="border-t pt-3 mt-2">
                     <div className="text-xs uppercase text-muted-foreground mb-2 flex items-center gap-1">

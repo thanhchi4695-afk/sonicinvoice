@@ -149,6 +149,8 @@ function SonicRankInner() {
 
       <LlmsTxtCard />
 
+      <PromptOptimizerPanel />
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label="Total collections" value={stats.total} />
         <StatCard label="Need attention" value={stats.needAttention} accent={stats.needAttention > 0 ? "red" : undefined} />

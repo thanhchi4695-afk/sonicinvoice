@@ -1,100 +1,103 @@
-## Goal
+# Phase 1 — AI Prompt Optimizer (Karpathy Loop)
 
-Integrate the Girls With Gems research as Sonic's definitive **JEWELLERY** vertical, adding 5 techniques no previous retailer contributed: brand+tag URL intersections, the Edits lifestyle system, a gifting engine, metal/gemstone static-filter collections, and the 5-part meaningful brand story formula.
+Autonomous nightly system that A/B tests SEO prompt variants and promotes winners based on merchant approval rates.
 
-Following the same shipping discipline used for David Jones / Louenhide: **engine logic that affects output quality ships first**, demo pre-seed last.
+## Scope (Phase 1)
 
----
+Targets the **collection description / SEO** generation path (`seo-collection-engine`), since that's where merchant approve/reject feedback already exists (`collection_suggestions.status` + `collection_seo_snapshots`). Other experiment types (`seo_title`, `meta_description`, `faq`) use the same tables but are wired in Phase 2.
 
-## Round 1 — Vertical detection + core schemas (ships first)
+## Database (one migration)
 
-These determine whether the engine produces *correct* output for jewellery stores at all. Without them, every subsequent piece is guesswork.
+**`prompt_experiments`** — versioned prompt variants
+- experiment_type, variant_id, prompt_template, temperature, few_shot_examples (jsonb), approval_rate, sample_size, is_active, parent_variant_id (for rollback), promoted_at
 
-1. **`industry_taxonomy` — JEWELLERY vertical seed**
-   - 11 dimensions: `jewellery_type`, `earring_style`, `necklace_style`, `bracelet_style`, `ring_style`, `metal`, `gemstone`, `style`, `occasion`, `theme`, `giftability`
-   - Detection rule in `seo-collection-detector`: brand allowlist (Amber Sceats, By Charlotte, Mayol, Arms of Eve, Emma Pills, Avant Studio, Noah The Label, Heaven Mayhem, Porter, Lana Wilkinson, Midsummer Star, Olga de Polga) **OR** title keyword match (necklace/earrings/bracelet/ring/bangle/pendant/hoop/stud/chain) → `vertical = JEWELLERY`
+**`prompt_experiment_feedback`** — per-content approval signal
+- experiment_id, variant_id, suggestion_id, user_id, approved, edited, time_to_approve_seconds
 
-2. **`seo-collection-engine` — three new schemas**
-   - `gwg_brand_page` (5-part: origin → aesthetic → product+material → brand+type keyword repetition ≥3 → sub-collection links + local CTA) — fires when `vertical=JEWELLERY` AND `isBrandPage`
-   - `gwg_edits` (3-part: lifestyle moment → product/brand snapshot → gifting CTA) — fires when collection handle matches `*-edit` or `gifting`
-   - `gwg_intersection` (brand + type, brand + metal) — fires when handle matches `{brand}-{jewellery_type}` or `{brand}-{metal}` patterns
+**`prompt_optimizer_log`** — run history
+- run_started_at, run_completed_at, experiments_ran, winning_variant_id, previous_variant_id, improvement_percentage, promoted (bool), error_message
 
-3. **Brand+tag intersection routing in `extendBody` and `formulaSchema`**
-   - Route JEWELLERY + `isBrandPage` → `gwg_brand_page`
-   - Route JEWELLERY + edit/gifting handle → `gwg_edits`
-   - Route JEWELLERY + intersection handle → `gwg_intersection`
-   - Fallback to existing `david_jones_4_part` for generic JEWELLERY type collections (works well for /collections/earrings etc.)
+**`test_product_set`** — held-constant 50-item set, refreshed weekly
+- product_id, set_week (date), position
 
-4. **Edit URL persistence rule** in collection lifecycle code
-   - When an Edit's season ends, **never delete the URL** — instead swap rules to evergreen giftable items and update copy to "[Season] has passed but…" per the Louenhide/Megantic learning already shipped.
+**Schema additions**
+- `collection_suggestions.prompt_variant_id text` — tag which variant generated this row
+- `collection_blogs.prompt_variant_id text` (if table exists; skip if not)
 
----
+RLS: admin-only write on experiments/log/test set; read for authenticated. Feedback writeable by content owner.
 
-## Round 2 — Keyword library + gifting engine + product title audit
+Seed: insert current hardcoded `seo-collection-engine` prompt as `v0` baseline with `is_active=true`.
 
-These improve output quality but only matter once Round 1 is producing the right *kind* of output.
+## Edge functions
 
-5. **`seo_keyword_library` — JEWELLERY seeding**
-   - Tier 2 (type+AU), Tier 3 (brand+type), Tier 4 (local Double Bay / Darwin / Sydney), Tier 5 (attribute+occasion), and a dedicated **gifting tier** (highest purchase intent — birthday/christmas/mothers-day/bridesmaid/valentines).
+**`prompt-optimizer-cron`** (verify_jwt=false, requires `CRON_SECRET`)
+1. Load active variant for `collection_description`
+2. Generate 5–7 variants via Lovable AI Gateway (`google/gemini-2.5-pro`) with structured output
+3. Insert variants into `prompt_experiments` (inactive)
+4. Load weekly test set (regenerate if older than 7 days from non-optimized in-stock products)
+5. For each variant × product, call internal generator with `variant_override` → store as draft `collection_suggestions` rows tagged with `prompt_variant_id`
+6. Write `prompt_optimizer_log` row (promotion happens later, see evaluator)
 
-6. **Gifting collection auto-generation** in `seo-collection-detector`
-   - By recipient (gifts-for-her/mum, bridesmaid-gifts), by occasion (birthday/christmas/valentines/mothers-day/anniversary/graduation), by price point (under-50/100/200 driven by `VARIANT_PRICE` rule), by giftability signal (`tag = gift-box | giftable`).
-   - Gifting-specific SEO title + meta + 6-question FAQ template (extends the structured FAQ already shipped in Part 6 of the David Jones round).
+**`prompt-optimizer-evaluator`** (runs after cron or on-demand)
+- Aggregates `prompt_experiment_feedback` per variant
+- Promotion gate: ≥100 feedback rows AND ≥5pp absolute lift over current default → mark new variant `is_active=true`, set previous `is_active=false`, record `promoted_at`
+- Rollback check: if current active was promoted <7 days ago and its rolling approval rate dropped below the previous default's recorded rate, flip back and log incident
 
-7. **Product title audit hook for jewellery** in `product-seo-optimiser.ts`
-   - When `vendor` is in the jewellery brand allowlist OR product type matches jewellery keywords, enforce `{Brand} {Style Name} {Metal} {Jewellery Type}` formula. Flag if jewellery type word missing; suggest append. Same audit/optimiser symmetry already used for accessories.
+**`prompt-optimizer-run`** (auth required, admin role)
+- Manual trigger that invokes the cron function with the user's auth context
 
----
+**Modify `seo-collection-engine`**
+- Accept optional `prompt_variant_id` param; if absent, load active variant from DB
+- Stamp `prompt_variant_id` on the inserted `collection_suggestions` row
 
-## Round 3 — Splash Swimwear Darwin pre-seed (deferred, same pattern as Stomp)
+**Hook approval feedback** — when `collection_suggestions.status` flips to `approved`/`rejected` and the row has a `prompt_variant_id`, insert into `prompt_experiment_feedback` (DB trigger).
 
-Demo/data work, not engine work. Requires Splash's `user_id` or for the store to be connected first.
+## Cron
 
-8. Pre-seed for Splash's 510-product jewellery range:
-   - Core type collections (earrings/necklaces/bracelets/rings/sets)
-   - Style subcollections (hoop/stud/pearl/drop, pendant/layering, bangles, stacking)
-   - Metal attribute collections (gold-jewellery, silver-jewellery, pearl-jewellery)
-   - Darwin-specific Edits: summer-edit (coastal), gifting, bridal-edit (destination weddings), christmas-edit (tourist market)
-   - Gifting engine seed: birthday-jewellery-gifts-darwin, christmas-jewellery-darwin
-   - Top-50 product title audit pass
+Insert via `supabase--insert` (not migration, contains URL + anon key):
+- `prompt-optimizer-cron` daily 02:00 UTC
+- `prompt-optimizer-evaluator` every 6 hours
 
----
+## UI — new section on Sonic Rank page
 
-## Why this order
+`src/components/PromptOptimizerPanel.tsx` added to `SonicRank.tsx`:
+- Toggle: autonomous optimization on/off (writes a row to `system_settings` or equivalent feature flag)
+- Schedule selector (display-only initially; daily 02:00)
+- "Current winning prompt" card: active template, temperature, approval rate, sample size
+- Recent experiments table: run date, variants tested, winner, improvement %, promoted yes/no
+- "Run manually now" button → invokes `prompt-optimizer-run`
+- "Preview test products" dialog: list of 50 current test products
+- Admin-role-gated via existing `useUserRole`
 
-- **Vertical detection + schemas first** because every other piece (keywords, gifting, audits) is conditional on `vertical = JEWELLERY` resolving correctly. Ship in the wrong order and you'd be writing prompts against placeholders again, which we explicitly avoided in the David Jones rollout.
-- **Keyword library + gifting second** because the gifting FAQ prompts and product-title audit reference the keyword tiers directly. Same dependency the David Jones rounds had.
-- **Pre-seed last** because no Splash connection exists in `platform_connections` yet (just confirmed for Stomp — same blocker applies here). Demo data without a store is wasted work.
+## Safety guardrails
 
----
+- Min sample size: 100 feedback rows before promotion
+- Min lift: ≥5pp absolute
+- 7-day rollback window with auto-revert on regression
+- Human override: admin can click any past variant in experiments table → set as active
+- Test set held constant for 7 days (refreshed Mondays)
 
-## Confirm before I start
+## Technical details
 
-Same order you approved for David Jones rounds — taxonomy → keyword library → schemas — applied to JEWELLERY. Reply "go" and I'll ship Round 1.
+- **AI Gateway**: `_shared/ai-gateway.ts` already supports `google/gemini-2.5-pro` with fallback; reuse for variant generation
+- **Variant generation** uses structured JSON output (`response_format: json_object`) to return `{variants: [{variant_id, prompt_template, temperature, few_shot_examples}]}`
+- **Test batch concurrency**: sequential with 500ms delay (per Shopify API doctrine memory) to avoid rate limits on downstream generator
+- **Approval rate calc**: `count(approved=true) / count(*)` over `prompt_experiment_feedback` filtered to current variant since `promoted_at`
+- **No client-side admin checks** — gated via `has_role(auth.uid(), 'admin')` in RLS + edge function JWT verification
+- **Feedback trigger**: AFTER UPDATE on `collection_suggestions` when `status` transitions and `prompt_variant_id IS NOT NULL`
 
----
+## Out of scope (Phase 2+)
 
-## Round 1 status: SHIPPED ✅
+- Experiment types beyond `collection_description`
+- Bandit/Thompson sampling (this phase is simple winner-takes-all)
+- Per-merchant prompt personalization
+- Cost tracking per variant
 
-- `industry_taxonomy` JEWELLERY vertical seeded (11 dimensions: jewellery_type, earring/necklace/bracelet/ring style, metal, gemstone, style, occasion, theme, giftability) via migration + insert.
-- `seo_keyword_library` and `industry_taxonomy` CHECK constraints widened to allow `JEWELLERY` and new keyword buckets (gifting, metal, gemstone, style, theme).
-- `seo-collection-engine`: added `gwg_meaningful` voice + three new schemas (`gwg_brand_page`, `gwg_edits`, `gwg_intersection`) wired into `stitchDescription`, `extendBody`, `formulaSchema`. Niche-keyword guard extended to JEWELLERY. Edge function deployed.
-- Edit URL persistence rule already lives in the Louenhide/Megantic shipped logic — applies to GWG Edits without further changes.
+## Build order
 
-## Round 2 status: SHIPPED ✅
-
-- **Keyword library** — 66 JEWELLERY rows seeded across high_volume, type_specific, brand_long_tail, local (Double Bay/Sydney/Darwin), metal, gemstone, style, theme, occasion, and a dedicated **gifting** tier (recipient/occasion/price-band/luxury).
-- **Gifting auto-generation** in `seo-collection-detector` — JEWELLERY vertical detection (brands + type + title), new vocab (JEWELLERY_TYPES/METALS/GEMSTONES, GIFT_RECIPIENTS/OCCASIONS/SIGNALS), and a gifting bucket loop emitting `gifts/jewellery-for-{recipient}`, `gifts/{occasion}-jewellery`, and `gifts/giftable-jewellery` with `collection_type='gifting'` (≥3 products).
-- **Product title audit** in `_shared/product-seo-optimiser.ts` — `isJewelleryVendor`, `detectJewelleryType`, `detectMetal` helpers + a JEWELLERY branch in `optimiseProductSeo` enforcing `{Brand} {Style Name} {Metal} {Jewellery Type}`, raising `no_jewellery_type_detected` / `no_metal_detected` audit flags, and writing a 4-paragraph jewellery body when copy is missing.
-- Both edge functions redeployed (`seo-collection-detector`, `publishing-agent`).
-
-## Round 3 — partial (validated end-to-end on connected store)
-
-- Initial smoke test against `testing-d9eimunn` returned only colour collections — investigation found two real bugs:
-  1. Detector skipped any product with empty `product_type` (`if (!parent) continue`) — masking 11 real jewellery items in the testing store.
-  2. The Round 2 niche-keyword blocklist was killing canonical jewellery type pages (necklaces/earrings/bracelets/rings) — those titles are *intentionally* the broad word for a type collection.
-- **Fixes shipped & redeployed:**
-  - Added `inferJewelleryParent(title)` — when `product_type` is empty, infer Necklaces/Earrings/Bracelets/Rings/Anklets/Charms from title (with false-positive guard for "ring front" swimwear).
-  - Niche-keyword guard now skipped for `kind === jewellery_type | metal | gemstone`.
-- **Validation:** detector against `testing-d9eimunn` now correctly emits a `jewellery_type` necklaces collection for the 3 untyped necklace products, alongside SWIMWEAR/CLOTHING colour and occasion collections — proves Round 1+2 fire end-to-end in production.
-- Splash Swimwear Darwin (`b8dcf887-…`) full pre-seed still deferred until their Shopify catalogue syncs into `products`.
+1. Migration (tables + RLS + trigger + seed v0)
+2. Update `seo-collection-engine` to use DB-stored active prompt
+3. New edge functions: `prompt-optimizer-cron`, `prompt-optimizer-evaluator`, `prompt-optimizer-run`
+4. UI panel on Sonic Rank
+5. Cron schedule (via `insert` tool)
+6. Manual smoke test

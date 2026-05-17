@@ -1833,9 +1833,12 @@ export type Database = {
           error_message: string | null
           geo_ready: boolean
           id: string
+          is_test_variant: boolean | null
           occasion_filter: string | null
           parent_collection_id: string | null
           product_count: number
+          prompt_experiment_id: string | null
+          prompt_variant_id: string | null
           rule_set: Json
           sample_images: string[]
           sample_product_ids: string[]
@@ -1867,9 +1870,12 @@ export type Database = {
           error_message?: string | null
           geo_ready?: boolean
           id?: string
+          is_test_variant?: boolean | null
           occasion_filter?: string | null
           parent_collection_id?: string | null
           product_count?: number
+          prompt_experiment_id?: string | null
+          prompt_variant_id?: string | null
           rule_set?: Json
           sample_images?: string[]
           sample_product_ids?: string[]
@@ -1901,9 +1907,12 @@ export type Database = {
           error_message?: string | null
           geo_ready?: boolean
           id?: string
+          is_test_variant?: boolean | null
           occasion_filter?: string | null
           parent_collection_id?: string | null
           product_count?: number
+          prompt_experiment_id?: string | null
+          prompt_variant_id?: string | null
           rule_set?: Json
           sample_images?: string[]
           sample_product_ids?: string[]
@@ -1930,6 +1939,13 @@ export type Database = {
             columns: ["parent_collection_id"]
             isOneToOne: false
             referencedRelation: "collection_suggestions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_suggestions_prompt_experiment_id_fkey"
+            columns: ["prompt_experiment_id"]
+            isOneToOne: false
+            referencedRelation: "prompt_experiments"
             referencedColumns: ["id"]
           },
         ]
@@ -5023,6 +5039,143 @@ export type Database = {
         }
         Relationships: []
       }
+      prompt_experiment_feedback: {
+        Row: {
+          approved: boolean | null
+          created_at: string
+          edited: boolean | null
+          experiment_id: string | null
+          experiment_type: string
+          id: string
+          suggestion_id: string | null
+          time_to_approve_seconds: number | null
+          user_id: string | null
+          variant_id: string
+        }
+        Insert: {
+          approved?: boolean | null
+          created_at?: string
+          edited?: boolean | null
+          experiment_id?: string | null
+          experiment_type: string
+          id?: string
+          suggestion_id?: string | null
+          time_to_approve_seconds?: number | null
+          user_id?: string | null
+          variant_id: string
+        }
+        Update: {
+          approved?: boolean | null
+          created_at?: string
+          edited?: boolean | null
+          experiment_id?: string | null
+          experiment_type?: string
+          id?: string
+          suggestion_id?: string | null
+          time_to_approve_seconds?: number | null
+          user_id?: string | null
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prompt_experiment_feedback_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "prompt_experiments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prompt_experiments: {
+        Row: {
+          approval_rate: number | null
+          created_at: string
+          experiment_type: string
+          few_shot_examples: Json | null
+          id: string
+          is_active: boolean | null
+          parent_variant_id: string | null
+          promoted_at: string | null
+          prompt_template: string
+          sample_size: number | null
+          temperature: number | null
+          updated_at: string
+          variant_id: string
+        }
+        Insert: {
+          approval_rate?: number | null
+          created_at?: string
+          experiment_type: string
+          few_shot_examples?: Json | null
+          id?: string
+          is_active?: boolean | null
+          parent_variant_id?: string | null
+          promoted_at?: string | null
+          prompt_template: string
+          sample_size?: number | null
+          temperature?: number | null
+          updated_at?: string
+          variant_id: string
+        }
+        Update: {
+          approval_rate?: number | null
+          created_at?: string
+          experiment_type?: string
+          few_shot_examples?: Json | null
+          id?: string
+          is_active?: boolean | null
+          parent_variant_id?: string | null
+          promoted_at?: string | null
+          prompt_template?: string
+          sample_size?: number | null
+          temperature?: number | null
+          updated_at?: string
+          variant_id?: string
+        }
+        Relationships: []
+      }
+      prompt_optimizer_log: {
+        Row: {
+          error_message: string | null
+          experiment_type: string
+          experiments_ran: number | null
+          id: string
+          improvement_percentage: number | null
+          notes: Json | null
+          previous_variant_id: string | null
+          promoted: boolean | null
+          run_completed_at: string | null
+          run_started_at: string
+          winning_variant_id: string | null
+        }
+        Insert: {
+          error_message?: string | null
+          experiment_type?: string
+          experiments_ran?: number | null
+          id?: string
+          improvement_percentage?: number | null
+          notes?: Json | null
+          previous_variant_id?: string | null
+          promoted?: boolean | null
+          run_completed_at?: string | null
+          run_started_at?: string
+          winning_variant_id?: string | null
+        }
+        Update: {
+          error_message?: string | null
+          experiment_type?: string
+          experiments_ran?: number | null
+          id?: string
+          improvement_percentage?: number | null
+          notes?: Json | null
+          previous_variant_id?: string | null
+          promoted?: boolean | null
+          run_completed_at?: string | null
+          run_started_at?: string
+          winning_variant_id?: string | null
+        }
+        Relationships: []
+      }
       purchase_order_lines: {
         Row: {
           actual_cost: number | null
@@ -7292,6 +7445,33 @@ export type Database = {
           total_products?: number | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      test_product_set: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json | null
+          position: number | null
+          product_id: string
+          set_week: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          position?: number | null
+          product_id: string
+          set_week: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          position?: number | null
+          product_id?: string
+          set_week?: string
         }
         Relationships: []
       }

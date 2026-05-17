@@ -1,72 +1,95 @@
-# Phase 3 — SEO Content A/B Tester
+## Brand Intelligence Crawler — Completion Plan
 
-Closes the Karpathy loop with real Google CTR data. Tests SEO title / meta description / H1 variants on high-traffic collections, measures via Google Search Console (GSC), and auto-promotes winners.
+Four sections, executed in order. Each section is independently shippable.
 
-## Approach decisions (MVP)
+---
 
-- **Approach B — Scheduled Deployment**: 7-day control → 7-day variant rotation by writing Shopify collection SEO fields directly. Faster to ship than liquid metafield rotation; we still store full variant history in metafields under `seo_ab_test.*` for audit/rollback.
-- **GSC auth**: use the existing **Google Search Console connector** (already in the Lovable connector catalog, gateway-based, no per-user OAuth needed for MVP — uses the workspace owner's connected GSC account).
-- **AI Gateway**: Gemini 2.5 Pro for variant generation, Gemini 2.5 Flash fallback (per project doctrine).
-- **Pattern**: AUTOMATION_FLOW with bounded LLM_CALL for variant generation (no agent loop).
+### Section 1 — Schema additions (migration, one-time)
 
-## Database (one migration)
+Add to `public.brand_intelligence`:
 
-New tables:
-- `seo_ab_experiments` — collection, variant_id, seo_title, meta_description, h1_tag, dates, impressions, clicks, ctr, position, is_winner, status
-- `seo_ab_experiment_log` — cron audit (started/completed, experiments_ran, winners, errors)
-- `seo_ab_schedule` — per-variant deployment windows (pending/active/completed/rolled_back)
-- `seo_ab_settings` — per-user toggles (enabled, min_impressions=100, min_ctr_lift=0.10, max_concurrent=3, excluded_collections[])
-- `seo_ab_gsc_daily` — daily impressions/clicks/ctr/position per (experiment_id, variant_id, date)
+- `priority smallint` — 1, 2, or NULL (custom brands)
+- `needs_manual_review boolean default false`
+- `size_range text`
+- `key_fabric_technologies jsonb` (string[])
+- `price_range_aud jsonb` (`{ min, max }`)
+- `collections_created integer default 0` — counter, populated by collection engine
+- Allowed `crawl_status` values: `not_crawled | crawling | completed | failed` (replacing `'crawled'` with `'completed'` per spec)
 
-RLS: user-scoped on `user_id`; service role full access for cron functions.
+One-time data migration: `UPDATE brand_intelligence SET crawl_status='completed' WHERE crawl_status='crawled'`.
 
-## Edge functions
+---
 
-1. `gsc-fetch-performance` — accepts `{ siteUrl, page, startDate, endDate }`, calls GSC `searchanalytics/query` via the `google_search_console` connector gateway, returns aggregated + daily rows. Internal helper used by other functions.
-2. `seo-ab-optimizer-start` — picks up to N eligible collections (≥100 impressions/30d, not tested in 60d, CTR ≤ 8%, not excluded), generates 2 variants per collection via Lovable AI Gateway, writes `seo_ab_experiments` + `seo_ab_schedule` rows. Deploys control for week 1.
-3. `seo-ab-optimizer-rotate` — daily tick. Activates the next scheduled variant when its window opens (writes Shopify collection `seo.title` / `seo.description` + H1 via GraphQL, stores prior values in `seo_ab_test.*` metafields). Marks completed schedules.
-4. `seo-ab-optimizer-collect` — daily, pulls GSC data for active/recently-active experiment URLs (skips last 3 days due to GSC delay), upserts into `seo_ab_gsc_daily`, recomputes `impressions/clicks/ctr/position` on experiments.
-5. `seo-ab-optimizer-evaluate` — when an experiment's window closes + 72h buffer: compares variants vs control. If lift ≥ `min_ctr_lift` and impressions ≥ threshold → mark winner, push winner's SEO to Shopify, log to `seo_ab_experiment_log`. Safety: CTR floor (terminate if <50% of control), manual approval gate at >25% lift.
-6. `seo-ab-optimizer-run` — admin manual trigger (chains start → rotate → collect → evaluate for the requesting user only).
+### Section 2 — Crawler edge function rewrite (`brand-intelligence-crawler/index.ts`)
 
-Cron (scheduled in DB after deploy):
-- `0 2 1,15 * *` → `seo-ab-optimizer-start`
-- `15 2 * * *` → `seo-ab-optimizer-rotate`
-- `0 8 * * *`  → `seo-ab-optimizer-collect`
-- `0 9 * * *`  → `seo-ab-optimizer-evaluate`
+Per brand:
 
-## Frontend
+1. Firecrawl `POST /v2/scrape` on homepage (`markdown`, `onlyMainContent: true`)
+2. Discover and scrape, max **10 pages total**, 500ms between fetches:
+   - `/collections` (and 1st 3 collection links from homepage)
+   - `/blogs` or `/blog` (and 1st 2 article links)
+   - `/about`
+3. Concatenate markdown → single Gemini 2.5 Pro extraction call via Lovable AI Gateway (matches existing AI Gateway pattern in this repo; Anthropic isn't currently wired into the gateway here).
+4. Extraction JSON schema exactly per spec: `category_vocabulary`, `collection_structure_type`, `brand_tone_sample`, `detected_print_story_names`, `detected_blog_topics`, `seo_keywords_detected`, `size_range`, `key_fabric_technologies`, `price_range_aud`.
+5. Confidence scoring exactly per spec (0.3 / 0.2 / 0.2 / 0.2 / 0.1 = 1.0).
+6. Upsert with `crawl_status='completed'`, `last_crawled_at=now()`, `needs_manual_review = (confidence < 0.6)`. On thrown error → `crawl_status='failed'`, `crawl_error=msg`.
+7. `console.log('[firecrawl-credits]', pages_fetched)` for budget tracking.
 
-New component `src/components/SeoAbTesterPanel.tsx` mounted on `src/pages/SonicRank.tsx`:
-- Settings card (enabled toggle, min impressions, min lift %, max concurrent, excluded collections)
-- Active tests card (collection, current variant, days remaining, predicted completion)
-- Experiments table (collection, control CTR, variant CTRs with deltas, winner, status, details)
-- Details modal (full SEO per variant, daily CTR chart from `seo_ab_gsc_daily`, "Apply winner now", "Extend 7 days")
-- Trend chart (avg CTR over time, winning rate)
-- "Run now" admin button
+Existing ICONIC / White Fox / Styletread reference scraping stays (separate edge functions, untouched).
 
-## Connector & secrets
+---
 
-- Link `google_search_console` connector (prompts you to pick/create a connection). Gateway env vars `LOVABLE_API_KEY` + `GOOGLE_SEARCH_CONSOLE_API_KEY` become available to edge functions automatically.
-- Reuses existing `SHOPIFY_*` secrets for collection writes.
-- No new manual secrets needed.
+### Section 3 — Seed 13 Splash brands
 
-## Safety guardrails (encoded in evaluator)
+Approach: **per-user, automatic on first `/brands` visit** (not a global DB seed — RLS requires `user_id`).
 
-- Min 100 impressions per variant before scoring
-- Min 7-day / max 21-day windows
-- CTR floor: kill variant if <50% control mid-test
-- Manual approval gate for >25% lift winners
-- 14-day rollback window (keep prior SEO snapshot)
-- Per-user concurrent test cap (default 3)
+On `/brands` mount, if the signed-in user has fewer than the 13 Splash brands by name, insert any missing ones with `crawl_status='not_crawled'` and the specified priority. The existing `PRIORITY_BRANDS` constant already has the right list; we just auto-run it instead of waiting for per-brand click.
 
-## Order of execution
+---
 
-1. Migration (5 tables + RLS + seed default `seo_ab_settings` row trigger)
-2. Link `google_search_console` connector
-3. Write all 6 edge functions
-4. Build `SeoAbTesterPanel.tsx` + mount on `SonicRank`
-5. Schedule the 4 cron jobs via `supabase--insert` (user-specific URLs/anon key)
-6. Update `mem://index.md` with a Phase 3 entry
+### Section 4 — `/brands` UI updates
 
-Confirm to proceed and I'll run the migration first.
+Column order: **Brand | Domain | Vertical | Status | Confidence | Collections | Last crawled | Actions**
+
+Status badges: `Not crawled` (grey) · `Crawling…` (amber + spinner) · `Completed (85%)` (green w/ score) · `Failed` (red + retry) · `Needs review` (orange when `needs_manual_review=true`).
+
+Actions per row: **Crawl now**, **View profile**, **Mark verified** toggle.
+
+Top of page: **Crawl all Priority 1** (skips already-completed) + **Crawl all** (confirm dialog quoting ~credit cost). Sequential, 1.5s between brands. Global progress bar with last-3-completed checkmarks.
+
+Side drawer (View profile):
+- Category vocab table (their_name → sonic_equivalent)
+- Collection structure type + plain-English explanation
+- Brand tone in a quote block
+- Print story names / blog topics / SEO keywords as pill tags
+- **Confidence breakdown** — list all 5 components with ✓/✗
+- Size range, fabric techs, price range AUD
+- Re-crawl / Edit manually / Mark verified
+
+Edit-manually mode: each field becomes an editable input; Save writes directly to `brand_intelligence`.
+
+---
+
+### Section 5 — Wire into generation engines
+
+- **`collection-intelligence`** edge function: fetch `brand_intelligence` row by brand name, inject prompt block (collection structure / their vocab / detected prints / tone) into the suggestion prompt.
+- **`seo-collection-engine`** edge function: inject `brand_tone_sample` + `seo_keywords_detected` into the SEO content generation prompt.
+
+Both are read-only injections — they degrade gracefully if no row exists.
+
+---
+
+### Verification step
+
+After deploy, I'll invoke the crawler for **Sea Level (sealevelswim.com.au)** via `curl_edge_functions`, paste the raw extracted JSON + computed confidence score, and confirm the row visible on `/brands`.
+
+---
+
+### Decisions I'm locking in (flag if any are wrong)
+
+1. **LLM:** Gemini 2.5 Pro via Lovable AI Gateway, not Anthropic Haiku. Matches every other extractor in this repo and the project memory rule. Output schema is identical.
+2. **Pre-seed:** per-user on `/brands` mount, not a global DB INSERT. `brand_intelligence` rows are scoped by `user_id` (RLS) so there is no other valid path.
+3. **Status rename:** `'crawled'` → `'completed'` everywhere (1 existing row updated by migration; UI badge wording switches too).
+4. **Auto pre-seed** does **not** auto-crawl — user still clicks **Crawl all Priority 1**.
+
+Reply "go" and I'll execute sections 1 → 5 then run the Sea Level verification. Reply with edits if any of the four locked decisions need to change.

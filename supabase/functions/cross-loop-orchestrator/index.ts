@@ -227,25 +227,29 @@ Return ONLY the JSON array, no prose.`;
 }
 
 async function storeAndMaybeAutoCreate(svc: any, userId: string, hypotheses: any[]) {
-  if (!hypotheses.length) return { stored: 0, autoCreated: 0 };
+  if (!hypotheses.length) return { stored: 0, autoCreated: 0, queuedForApproval: 0 };
   const { data: settings } = await svc.from("ai_brain_settings").select("*").eq("user_id", userId).maybeSingle();
   const autoEnabled = !!settings?.autonomous_enabled;
   const minConf = Number(settings?.min_confidence_for_auto ?? 0.9);
   const maxConcurrent = Number(settings?.max_concurrent_auto_tests ?? 3);
   const excluded: string[] = settings?.excluded_targets ?? [];
 
-  // Count active auto tests
+  // Count active auto tests (already deployed)
   const { count } = await svc.from("auto_test_hypotheses")
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId).eq("status", "testing");
-  let activeCount = count ?? 0;
+  const activeCount = count ?? 0;
 
-  let autoCreated = 0;
+  // NEW: merchant approval is REQUIRED before any auto-test deploys.
+  // The orchestrator never sets status='testing' directly — it queues high-confidence
+  // candidates as 'awaiting_approval' so the merchant can review the audit trail and approve.
+  // Lower-confidence / disabled-autonomous candidates go to 'pending' as suggestions.
+  let queuedForApproval = 0;
   const rows = hypotheses.slice(0, 20).map((h: any) => {
     const target = String(h.target_id ?? "");
     const conf = Number(h.confidence ?? 0);
-    const canAuto = autoEnabled && conf >= minConf && activeCount < maxConcurrent && !excluded.includes(target);
-    if (canAuto) { activeCount++; autoCreated++; }
+    const eligible = autoEnabled && conf >= minConf && activeCount < maxConcurrent && !excluded.includes(target);
+    if (eligible) queuedForApproval++;
     return {
       user_id: userId,
       hypothesis_type: String(h.hypothesis_type ?? "seo_title"),
@@ -256,12 +260,25 @@ async function storeAndMaybeAutoCreate(svc: any, userId: string, hypotheses: any
       reasoning: h.reasoning ?? null,
       expected_impact_pct: Number(h.expected_impact_pct ?? 0),
       confidence: conf,
-      status: canAuto ? "testing" : "pending",
-      auto_created: canAuto,
+      status: eligible ? "awaiting_approval" : "pending",
+      auto_created: false,
     };
   });
-  await svc.from("auto_test_hypotheses").insert(rows);
-  return { stored: rows.length, autoCreated };
+  const { data: inserted } = await svc.from("auto_test_hypotheses").insert(rows).select("id, status, hypothesis_type, target_id, proposed_value, confidence");
+  // Write audit rows so the merchant has a record of what the agent proposed.
+  if (inserted?.length) {
+    await svc.from("auto_test_audit").insert(inserted.map((r: any) => ({
+      user_id: userId,
+      hypothesis_id: r.id,
+      action: r.status === "awaiting_approval" ? "queued_for_approval" : "proposed",
+      actor: "orchestrator",
+      snapshot: r,
+      reason: r.status === "awaiting_approval"
+        ? "Met autonomous threshold; awaiting merchant approval before deployment"
+        : "Hypothesis suggested for merchant review",
+    })));
+  }
+  return { stored: rows.length, autoCreated: 0, queuedForApproval };
 }
 
 async function runForUser(svc: any, userId: string) {
@@ -273,7 +290,7 @@ async function runForUser(svc: any, userId: string) {
     const conflicts = await detectConflicts(svc, userId, signals, weights);
     const underperformers = await identifyUnderperformers(svc, userId);
     const hypotheses = await generateHypotheses(userId, weights, underperformers);
-    const { stored, autoCreated } = await storeAndMaybeAutoCreate(svc, userId, hypotheses);
+    const { stored, autoCreated, queuedForApproval } = await storeAndMaybeAutoCreate(svc, userId, hypotheses);
 
     await svc.from("cross_loop_run_log").insert({
       user_id: userId,
@@ -283,9 +300,9 @@ async function runForUser(svc: any, userId: string) {
       conflicts_resolved: conflicts.length,
       hypotheses_generated: stored,
       auto_tests_created: autoCreated,
-      details: { weights, underperformers: underperformers.length },
+      details: { weights, underperformers: underperformers.length, queued_for_approval: queuedForApproval },
     });
-    return { ok: true, signals: signals.length, conflicts: conflicts.length, hypotheses: stored, autoCreated };
+    return { ok: true, signals: signals.length, conflicts: conflicts.length, hypotheses: stored, queuedForApproval };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await svc.from("cross_loop_run_log").insert({

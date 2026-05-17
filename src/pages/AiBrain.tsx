@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Brain, Loader2, Sparkles, AlertTriangle, TrendingUp } from "lucide-react";
+import { Brain, Loader2, Sparkles, AlertTriangle, TrendingUp, Check, X, ShieldCheck, History } from "lucide-react";
 
 type Weight = { metric_name: string; weight: number; sample_size: number };
 type Hypothesis = {
@@ -25,6 +25,10 @@ type RunLog = {
   signals_collected: number; conflicts_resolved: number;
   hypotheses_generated: number; auto_tests_created: number; error_message: string | null;
 };
+type AuditRow = {
+  id: string; hypothesis_id: string; action: string; actor: string;
+  reason: string | null; snapshot: any; created_at: string;
+};
 
 const METRIC_LABELS: Record<string, string> = {
   ctr: "CTR (search clicks)",
@@ -40,6 +44,8 @@ export default function AiBrain() {
   const [hypotheses, setHypotheses] = useState<Hypothesis[]>([]);
   const [resolutions, setResolutions] = useState<Resolution[]>([]);
   const [runs, setRuns] = useState<RunLog[]>([]);
+  const [audit, setAudit] = useState<AuditRow[]>([]);
+  const [acting, setActing] = useState<string | null>(null);
   const [settings, setSettings] = useState({
     autonomous_enabled: false,
     max_concurrent_auto_tests: 3,
@@ -53,19 +59,37 @@ export default function AiBrain() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoading(false); return; }
-    const [w, h, r, l, s] = await Promise.all([
+    const [w, h, r, l, s, a] = await Promise.all([
       supabase.from("business_impact_weights").select("*").eq("user_id", user.id),
       supabase.from("auto_test_hypotheses").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
       supabase.from("cross_loop_resolutions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
       supabase.from("cross_loop_run_log").select("*").eq("user_id", user.id).order("started_at", { ascending: false }).limit(10),
       supabase.from("ai_brain_settings").select("*").eq("user_id", user.id).maybeSingle(),
+      supabase.from("auto_test_audit").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
     ]);
     setWeights((w.data ?? []) as Weight[]);
     setHypotheses((h.data ?? []) as Hypothesis[]);
     setResolutions((r.data ?? []) as Resolution[]);
     setRuns((l.data ?? []) as RunLog[]);
+    setAudit((a.data ?? []) as AuditRow[]);
     if (s.data) setSettings({ ...settings, ...s.data });
     setLoading(false);
+  };
+
+  const respond = async (hypothesisId: string, action: "approve" | "reject") => {
+    setActing(hypothesisId);
+    try {
+      let reason: string | null = null;
+      if (action === "reject") reason = window.prompt("Reason for rejecting (optional)?") ?? null;
+      const { error } = await supabase.functions.invoke("ai-brain-approve", {
+        body: { hypothesis_id: hypothesisId, action, reason },
+      });
+      if (error) throw error;
+      toast({ title: action === "approve" ? "Approved — deploying test" : "Rejected" });
+      await load();
+    } catch (e: any) {
+      toast({ title: "Action failed", description: e?.message, variant: "destructive" });
+    } finally { setActing(null); }
   };
 
   useEffect(() => { load(); }, []);
@@ -153,24 +177,65 @@ export default function AiBrain() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Automated test hypotheses</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldCheck className="w-4 h-4" /> Awaiting your approval
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            High-confidence hypotheses never deploy automatically. Review the proposed change, then approve or reject — every action is recorded in the audit log below.
+          </p>
         </CardHeader>
         <CardContent>
-          {hypotheses.length === 0 && <p className="text-sm text-muted-foreground">No hypotheses yet.</p>}
+          {hypotheses.filter(h => h.status === "awaiting_approval").length === 0 && (
+            <p className="text-sm text-muted-foreground">No tests waiting for approval.</p>
+          )}
           <div className="space-y-2">
-            {hypotheses.map(h => (
+            {hypotheses.filter(h => h.status === "awaiting_approval").map(h => (
+              <div key={h.id} className="border border-primary/40 bg-primary/5 rounded p-3 text-sm">
+                <div className="flex justify-between items-start gap-2 mb-2">
+                  <div className="flex-1">
+                    <div className="font-medium">{h.target_label ?? h.target_id}</div>
+                    <div className="text-xs text-muted-foreground mb-1">{h.hypothesis_type}</div>
+                    {h.current_value && <div className="text-xs"><span className="text-muted-foreground">Current:</span> <code className="text-[11px]">{h.current_value}</code></div>}
+                    {h.proposed_value && <div className="text-xs mt-1"><span className="text-muted-foreground">Propose:</span> <code className="text-[11px]">{h.proposed_value}</code></div>}
+                    {h.reasoning && <div className="text-xs text-muted-foreground mt-1">{h.reasoning}</div>}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-xs">conf {(h.confidence * 100).toFixed(0)}%</div>
+                    <div className="text-xs text-emerald-600">+{Number(h.expected_impact_pct).toFixed(0)}%</div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => respond(h.id, "approve")} disabled={acting === h.id}>
+                    <Check className="w-3.5 h-3.5 mr-1" /> Approve & deploy
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => respond(h.id, "reject")} disabled={acting === h.id}>
+                    <X className="w-3.5 h-3.5 mr-1" /> Reject
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">All hypotheses & deployed tests</CardTitle></CardHeader>
+        <CardContent>
+          {hypotheses.filter(h => h.status !== "awaiting_approval").length === 0 && (
+            <p className="text-sm text-muted-foreground">No other hypotheses yet.</p>
+          )}
+          <div className="space-y-2">
+            {hypotheses.filter(h => h.status !== "awaiting_approval").map(h => (
               <div key={h.id} className="border border-border rounded p-3 text-sm">
                 <div className="flex justify-between items-start gap-2">
                   <div className="flex-1">
                     <div className="font-medium">{h.target_label ?? h.target_id}</div>
                     <div className="text-xs text-muted-foreground mb-1">{h.hypothesis_type}</div>
                     {h.proposed_value && <div className="text-xs"><span className="text-muted-foreground">Propose:</span> {h.proposed_value}</div>}
-                    {h.reasoning && <div className="text-xs text-muted-foreground mt-1">{h.reasoning}</div>}
                   </div>
                   <div className="text-right shrink-0">
-                    <Badge variant={h.auto_created ? "default" : "outline"}>{h.status}</Badge>
+                    <Badge variant={h.status === "testing" ? "default" : h.status === "rejected" ? "destructive" : "outline"}>{h.status}</Badge>
                     <div className="text-xs mt-1">conf {(h.confidence * 100).toFixed(0)}%</div>
-                    <div className="text-xs text-emerald-600">+{Number(h.expected_impact_pct).toFixed(0)}%</div>
                   </div>
                 </div>
               </div>
@@ -218,6 +283,30 @@ export default function AiBrain() {
                 <span>{new Date(r.started_at).toLocaleString()}</span>
                 <span>signals {r.signals_collected} · conflicts {r.conflicts_resolved} · hyp {r.hypotheses_generated} · auto {r.auto_tests_created}</span>
                 {r.error_message && <span className="text-destructive">{r.error_message}</span>}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <History className="w-4 h-4" /> Approval audit trail
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">Every proposal, approval, rejection, and deployment is recorded here.</p>
+        </CardHeader>
+        <CardContent>
+          {audit.length === 0 && <p className="text-sm text-muted-foreground">No audit entries yet.</p>}
+          <div className="space-y-1 text-xs">
+            {audit.map(a => (
+              <div key={a.id} className="flex justify-between gap-2 border-b border-border pb-1">
+                <span className="font-mono text-muted-foreground shrink-0">{new Date(a.created_at).toLocaleString()}</span>
+                <span className="flex-1 truncate">
+                  <Badge variant="outline" className="mr-1 text-[10px]">{a.action}</Badge>
+                  <span className="text-muted-foreground">by {a.actor}</span>
+                  {a.reason && <span className="ml-2 italic">"{a.reason}"</span>}
+                </span>
               </div>
             ))}
           </div>

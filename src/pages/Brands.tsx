@@ -321,6 +321,45 @@ export default function Brands() {
         </div>
       </Card>
 
+      <Card className="p-4 mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="font-semibold text-sm">Batch crawl</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Seeds (if missing) and crawls every Priority 1 brand sequentially with Firecrawl pacing.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" disabled={!!batchProgress || !!crawlingId} onClick={() => crawlAllPriority1("Splash")}>
+              {batchProgress ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
+              Crawl Splash Priority 1
+            </Button>
+            <Button size="sm" variant="outline" disabled={!!batchProgress || !!crawlingId} onClick={() => crawlAllPriority1("Stomp")}>
+              {batchProgress ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
+              Crawl Stomp Priority 1
+            </Button>
+            <Button size="sm" disabled={!!batchProgress || !!crawlingId} onClick={() => crawlAllPriority1()}>
+              {batchProgress ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
+              Crawl all Priority 1
+            </Button>
+          </div>
+        </div>
+        {batchProgress && (
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+              <span>Crawling {batchProgress.current}…</span>
+              <span>{batchProgress.done} / {batchProgress.total}</span>
+            </div>
+            <div className="h-1.5 w-full rounded bg-muted overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${Math.round((batchProgress.done / batchProgress.total) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </Card>
+
       {loading ? (
         <div className="flex items-center justify-center p-12"><Loader2 className="h-6 w-6 animate-spin" /></div>
       ) : filteredRows.length === 0 ? (

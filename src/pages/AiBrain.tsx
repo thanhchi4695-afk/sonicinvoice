@@ -289,6 +289,30 @@ export default function AiBrain() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <History className="w-4 h-4" /> Approval audit trail
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">Every proposal, approval, rejection, and deployment is recorded here.</p>
+        </CardHeader>
+        <CardContent>
+          {audit.length === 0 && <p className="text-sm text-muted-foreground">No audit entries yet.</p>}
+          <div className="space-y-1 text-xs">
+            {audit.map(a => (
+              <div key={a.id} className="flex justify-between gap-2 border-b border-border pb-1">
+                <span className="font-mono text-muted-foreground shrink-0">{new Date(a.created_at).toLocaleString()}</span>
+                <span className="flex-1 truncate">
+                  <Badge variant="outline" className="mr-1 text-[10px]">{a.action}</Badge>
+                  <span className="text-muted-foreground">by {a.actor}</span>
+                  {a.reason && <span className="ml-2 italic">"{a.reason}"</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       {loading && <div className="text-center text-sm text-muted-foreground">Loading…</div>}
     </div>
   );

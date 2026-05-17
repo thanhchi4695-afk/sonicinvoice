@@ -79,6 +79,9 @@ export default function Brands() {
   const [loading, setLoading] = useState(true);
   const [crawlingId, setCrawlingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<BrandRow | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editDraft, setEditDraft] = useState<Partial<BrandRow>>({});
+  const [savingEdit, setSavingEdit] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDomain, setNewDomain] = useState("");
   const [verticalFilter, setVerticalFilter] = useState<"ALL" | Vertical>("ALL");

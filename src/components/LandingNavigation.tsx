@@ -34,12 +34,6 @@ export default function Navigation() {
 
         <div className="hidden md:flex items-center gap-4">
           <a
-            href="/how-it-works"
-            className="text-sm text-[#a3a3a3] hover:text-[#fafafa] transition-colors duration-300"
-          >
-            How it works
-          </a>
-          <a
             href="/workflows"
             className="text-sm text-[#a3a3a3] hover:text-[#fafafa] transition-colors duration-300"
           >

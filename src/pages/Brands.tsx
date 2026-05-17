@@ -433,12 +433,12 @@ export default function Brands() {
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr className="text-left">
-                <th className="p-3">Brand</th>
+                <th className="p-3">Brand name</th>
                 <th className="p-3">Domain</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Structure</th>
-                <th className="p-3">Tone</th>
+                <th className="p-3">Industry vertical</th>
+                <th className="p-3">Crawl status</th>
                 <th className="p-3">Confidence</th>
+                <th className="p-3">Collections created</th>
                 <th className="p-3">Last crawled</th>
                 <th className="p-3 text-right">Actions</th>
               </tr>

@@ -279,6 +279,10 @@ export default function Agent() {
         }
 
         const { data: { session } } = await supabase.auth.getSession();
+        const currentUserId = session?.user?.id ?? userId;
+        if (!currentUserId) {
+          throw new Error("Your session has expired. Sign in again, then try the agent.");
+        }
         const resp = await fetch(`${AGENT_URL}/chat`, {
           method: "POST",
           headers: {
@@ -286,7 +290,7 @@ export default function Agent() {
             "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
           },
-          body: JSON.stringify({ message: trimmed, run_id: runId, shop_id: shopId, dry_run: dryRun }),
+          body: JSON.stringify({ message: trimmed, run_id: runId, shop_id: shopId, user_id: currentUserId, dry_run: dryRun }),
         });
         if (!resp.ok || !resp.body) {
           const errBody = await resp.text().catch(() => "");
@@ -350,7 +354,7 @@ export default function Agent() {
         setSending(false);
       }
     },
-    [sending, runId, shopId, dryRun, setParams],
+    [sending, runId, shopId, userId, dryRun, setParams],
   );
 
   const onSubmit = (e: React.FormEvent) => { e.preventDefault(); sendMessage(input); };

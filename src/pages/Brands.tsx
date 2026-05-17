@@ -569,8 +569,69 @@ export default function Brands() {
                     </ul>
                   </div>
                 )}
+                {/* New extracted fields */}
+                {(selected.size_range || (selected.key_fabric_technologies?.length ?? 0) > 0 || selected.price_range_aud) && (
+                  <div className="border-t pt-3 grid grid-cols-2 gap-3">
+                    {selected.size_range && (
+                      <div>
+                        <div className="text-xs uppercase text-muted-foreground">Size range</div>
+                        <div>{selected.size_range}</div>
+                      </div>
+                    )}
+                    {selected.price_range_aud && (selected.price_range_aud.min != null || selected.price_range_aud.max != null) && (
+                      <div>
+                        <div className="text-xs uppercase text-muted-foreground">Price range (AUD)</div>
+                        <div>${selected.price_range_aud.min ?? "?"} – ${selected.price_range_aud.max ?? "?"}</div>
+                      </div>
+                    )}
+                    {(selected.key_fabric_technologies?.length ?? 0) > 0 && (
+                      <div className="col-span-2">
+                        <div className="text-xs uppercase text-muted-foreground">Key fabrics / technologies</div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {selected.key_fabric_technologies!.map((f) => <Badge key={f} variant="outline">{f}</Badge>)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Confidence breakdown widget */}
+                <div className="border-t pt-3">
+                  <div className="text-xs uppercase text-muted-foreground mb-2">Confidence breakdown</div>
+                  {(() => {
+                    const vocab = Object.keys(selected.category_vocabulary ?? {}).length;
+                    const blogs = (selected.blog_topics_used?.length ?? 0);
+                    const prints = (selected.print_story_names?.length ?? 0);
+                    const items = [
+                      { label: "Category vocabulary > 3", ok: vocab > 3, weight: 0.3, detail: `${vocab} terms` },
+                      { label: "Collection structure", ok: !!selected.collection_structure_type, weight: 0.2, detail: selected.collection_structure_type ?? "—" },
+                      { label: "Blog topics > 2", ok: blogs > 2, weight: 0.2, detail: `${blogs} topics` },
+                      { label: "Brand tone detected", ok: !!selected.brand_tone, weight: 0.2, detail: selected.brand_tone ?? "—" },
+                      { label: "Print/story names > 1", ok: prints > 1, weight: 0.1, detail: `${prints} names` },
+                    ];
+                    return (
+                      <ul className="space-y-1 text-xs">
+                        {items.map((it) => (
+                          <li key={it.label} className="flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              {it.ok
+                                ? <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                : <AlertCircle className="h-3 w-3 text-muted-foreground" />}
+                              {it.label}
+                              <span className="text-muted-foreground">(+{it.weight.toFixed(2)})</span>
+                            </span>
+                            <span className="text-muted-foreground">{it.detail}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    );
+                  })()}
+                </div>
+
                 <div className="text-xs text-muted-foreground border-t pt-3">
                   Confidence: {selected.crawl_confidence != null ? `${Math.round(selected.crawl_confidence * 100)}%` : "—"} •
+                  Priority: {selected.priority != null ? `P${selected.priority}` : "—"} •
+                  Collections created: {selected.collections_created ?? 0} •
                   {selected.pages_fetched ?? 0} pages •
                   Last crawled: {selected.last_crawled_at ? new Date(selected.last_crawled_at).toLocaleString() : "never"}
                 </div>

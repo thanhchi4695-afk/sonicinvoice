@@ -172,10 +172,13 @@ Return STRICT JSON (no prose, no markdown fences) with this exact shape:
   "brand_tone_sample": "60-80 word excerpt of their voice",
   "blog_topics_used": ["styling-guide" | "fit-guide" | "sizing-guide" | "sustainability" | "care-guide" | "trend-report" | "brand-story" | "destination" | "occasion-guide" | "technology-explainer" | "other"],
   "blog_topic_distribution": {"sizing-guide": 2, "care-guide": 1},
-  "blog_sample_titles": ["up to 5 of their actual titles"]
+  "blog_sample_titles": ["up to 5 of their actual titles"],
+  "size_range": "e.g. XS-3XL or 6-20 — leave empty string if not detected",
+  "key_fabric_technologies": ["e.g. chlorine-resistant", "4-way stretch", "recycled-nylon"],
+  "price_range_aud": { "min": 0, "max": 0 }
 }
 
-Identify the PRIMARY structure type (the dominant axis the brand uses to organise products) and a SECONDARY if they clearly use two axes. Pick from the listed options exactly.`;
+Identify the PRIMARY structure type (the dominant axis the brand uses to organise products) and a SECONDARY if they clearly use two axes. Pick from the listed options exactly. For price_range_aud, infer typical price points in AUD from any prices visible in the copy; use 0,0 if none visible.`;
   const resp = await callAI({
     model: "google/gemini-2.5-pro",
     messages: [{ role: "user", content: prompt }],

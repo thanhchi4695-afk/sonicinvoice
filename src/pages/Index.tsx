@@ -61,6 +61,14 @@ export interface FlowParams {
   [key: string]: unknown;
 }
 
+// Reconciliation payload stashed by InvoiceFlow before navigating to the review panel.
+// Shape is intentionally open — downstream consumers narrow as needed.
+export interface ReconciliationResult {
+  sets?: unknown[];
+  invoiceId?: string;
+  [key: string]: unknown;
+}
+
 // Consume one-shot flow params stashed on window by the navigate-flow event.
 // Reading clears the value so a later flow can't pick up stale data.
 const consumeFlowParams = (): FlowParams | undefined => {
@@ -68,9 +76,22 @@ const consumeFlowParams = (): FlowParams | undefined => {
   delete (window as unknown as { __sonicFlowParams?: FlowParams }).__sonicFlowParams;
   return p;
 };
-if (typeof window !== "undefined") {
-  (window as unknown as { __sonicConsumeFlowParams: () => FlowParams | undefined }).__sonicConsumeFlowParams = consumeFlowParams;
-}
+
+// Hoisted out of the component to avoid re-allocating a Set on every render.
+// Phase breadcrumb is only meaningful while inside the invoice pipeline.
+const INVOICE_PHASE_FLOWS: ReadonlySet<string> = new Set([
+  "invoice", "scan_mode", "packing_slip", "email_inbox", "joor",
+  "wholesale_import", "lookbook_import", "order_form",
+  "catalog_memory", "supplier_intelligence", "stock_check", "stock_reconciliation",
+  "product_descriptions", "image_optimise", "collection_seo",
+  "collab_seo", "organic_seo", "geo_agentic", "style_grouping", "csv_seo",
+  "price_adjust", "price_lookup", "price_match", "margin_protection",
+  "markdown_ladder", "competitor_intel", "sale",
+  "google_ads_setup", "meta_ads_setup", "feed_optimise", "feed_health",
+  "google_ads", "social_media", "lightspeed_convert",
+]);
+const PHASE_TABS: ReadonlySet<string> = new Set(["analytics"]);
+
 
 
 import { useStoreMode } from "@/hooks/use-store-mode";
@@ -97,7 +118,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   const [useStockyDashboard, setUseStockyDashboard] = useState(() => localStorage.getItem("stocky_dashboard_mode") === "true");
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showQuickSearch, setShowQuickSearch] = useState(false);
-  const [reconciliationResult, setReconciliationResult] = useState<any>(null);
+  const [reconciliationResult, setReconciliationResult] = useState<ReconciliationResult | null>(null);
   const [historyPatternId, setHistoryPatternId] = useState<string | null>(null);
 
   const handleReconciliationExport = useCallback((_sets: unknown) => {
@@ -143,6 +164,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
     };
     const onQuickSearch = () => setShowQuickSearch(true);
     (window as unknown as { __sonicOpenQuickSearch?: () => void }).__sonicOpenQuickSearch = () => setShowQuickSearch(true);
+    (window as unknown as { __sonicConsumeFlowParams?: () => FlowParams | undefined }).__sonicConsumeFlowParams = consumeFlowParams;
     window.addEventListener("sonic:reconciliation-ready", onReady as EventListener);
     window.addEventListener("sonic:navigate-flow", onNavFlow as EventListener);
     window.addEventListener("sonic:navigate-tab", onNavTab as EventListener);
@@ -153,28 +175,13 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       window.removeEventListener("sonic:navigate-tab", onNavTab as EventListener);
       window.removeEventListener("sonic:open-quick-search", onQuickSearch);
       delete (window as unknown as { __sonicOpenQuickSearch?: () => void }).__sonicOpenQuickSearch;
+      delete (window as unknown as { __sonicConsumeFlowParams?: () => FlowParams | undefined }).__sonicConsumeFlowParams;
     };
   }, []);
   
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead, dismiss } = useNotifications();
   const { isEmbedded, shop, authState: embeddedAuthState, authError: embeddedAuthError } = useShopifyEmbedded();
-
-  // Phase breadcrumb is only meaningful while the user is inside the invoice
-  // pipeline. On Inventory / Suppliers / Billing / Account etc. it creates a
-  // false signal that an invoice is "in progress". Hide it everywhere else.
-  const INVOICE_PHASE_FLOWS = new Set([
-    "invoice", "scan_mode", "packing_slip", "email_inbox", "joor",
-    "wholesale_import", "lookbook_import", "order_form",
-    "catalog_memory", "supplier_intelligence", "stock_check", "stock_reconciliation",
-    "product_descriptions", "image_optimise", "collection_seo",
-    "collab_seo", "organic_seo", "geo_agentic", "style_grouping", "csv_seo",
-    "price_adjust", "price_lookup", "price_match", "margin_protection",
-    "markdown_ladder", "competitor_intel", "sale",
-    "google_ads_setup", "meta_ads_setup", "feed_optimise", "feed_health",
-    "google_ads", "social_media", "lightspeed_convert",
-  ]);
-  const PHASE_TABS = new Set(["analytics"]);
 
   // ── Standalone session management (non-embedded only) ──
   // Embedded auth is handled entirely by ShopifyEmbeddedProvider.
@@ -184,6 +191,15 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       // No Supabase listener needed here — the provider already set the session.
       return;
     }
+
+    // Guard so the first responder (listener OR getSession) flips authLoading,
+    // and the slower one becomes a no-op — prevents a late flicker.
+    let loadingResolved = false;
+    const resolveLoading = () => {
+      if (loadingResolved) return;
+      loadingResolved = true;
+      setAuthLoading(false);
+    };
 
     // Set up auth state listener FIRST (standalone only)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -196,7 +212,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         localStorage.removeItem("onboarding_complete");
         setOnboarded(false);
       }
-      setAuthLoading(false);
+      resolveLoading();
     });
 
     // Then check for existing session
@@ -207,8 +223,9 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         localStorage.removeItem("onboarding_complete");
         setOnboarded(false);
       }
-      setAuthLoading(false);
+      resolveLoading();
     });
+
 
     return () => subscription.unsubscribe();
   }, [isEmbedded]);
@@ -329,7 +346,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
     { key: "r", label: "R", description: "Receive Stock", action: () => setActiveFlow("quick_receive") },
     { key: "t", label: "T", description: "New Stocktake", action: () => setActiveFlow("stocktake_module") },
     { key: "s", label: "S", description: "Focus Barcode Scanner", action: () => setActiveFlow("scan_mode") },
-    { key: "t", shift: true, label: "⇧T", description: "Open Tools tab", action: () => { setActiveFlow(null); setActiveTab("tools"); } },
+    { key: "o", label: "O", description: "Open Tools tab", action: () => { setActiveFlow(null); setActiveTab("tools"); } },
     { key: "k", ctrl: true, label: "⌘K", description: "Quick Search", action: () => setShowQuickSearch(true) },
     { key: "?", label: "?", description: "Keyboard Shortcuts", action: () => setShowShortcuts(true) },
   ], []);
@@ -444,6 +461,42 @@ const Index = ({ initialTab }: IndexProps = {}) => {
     );
   }
 
+  // Shared header element — single source of truth for the notification bell so
+  // the three layout branches (embedded / desktop / mobile) can't drift apart
+  // or accidentally double-mount it on tablet at the 1024px boundary.
+  const notificationBell = (
+    <NotificationBell
+      notifications={notifications}
+      unreadCount={unreadCount}
+      onMarkRead={markRead}
+      onMarkAllRead={markAllRead}
+      onDismiss={dismiss}
+      onNavigate={(link) => {
+        if (isFlowKey(link)) {
+          setActiveFlow(link);
+        } else {
+          setActiveFlow(null);
+          setActiveTab(link);
+        }
+      }}
+    />
+  );
+
+  // Shared phase breadcrumb — rendered only while inside an invoice-pipeline
+  // flow (or analytics tab). Extracted so all three layouts stay in sync.
+  const phaseBar =
+    (activeFlow && INVOICE_PHASE_FLOWS.has(activeFlow as string)) ||
+    (!activeFlow && PHASE_TABS.has(activeTab)) ? (
+      <PhaseProgressBar
+        activeTab={activeTab}
+        activeFlow={activeFlow}
+        onNavigate={(t) => {
+          if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
+          else { safeSetFlow(t.id); }
+        }}
+      />
+    ) : null;
+
   const mainContent = (
     <>
       {(activeTab === "home" || activeTab === "start") && (
@@ -541,11 +594,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         )}
         {activeTab === "analytics" && <AnalyticsPanel />}
         {activeTab === "history" && <HistoryScreen />}
-        {activeTab === "flywheel" && (
-          <Suspense fallback={suspenseFallback}>
-            <FlywheelDashboard />
-          </Suspense>
-        )}
+        {activeTab === "flywheel" && <FlywheelDashboard />}
         {activeTab === "tools" && <ToolsScreen onStartFlow={handleStartFlow} />}
         {activeTab === "guide" && <HowToCatalog onNavigateToFeature={(f) => safeSetFlow(f)} onNavigateToTab={(t) => { setActiveFlow(null); setActiveTab(t); }} />}
         {activeTab === "google_ads" && <AdsGuideTabs />}
@@ -577,32 +626,9 @@ const Index = ({ initialTab }: IndexProps = {}) => {
                 ← Back
               </button>
             )}
-            <NotificationBell
-              notifications={notifications}
-              unreadCount={unreadCount}
-              onMarkRead={markRead}
-              onMarkAllRead={markAllRead}
-              onDismiss={dismiss}
-              onNavigate={(link) => {
-                if (isFlowKey(link)) {
-                  setActiveFlow(link);
-                } else {
-                  setActiveFlow(null);
-                  setActiveTab(link);
-                }
-              }}
-            />
+            {notificationBell}
           </div>
-          {(activeFlow && INVOICE_PHASE_FLOWS.has(activeFlow as string)) || (!activeFlow && PHASE_TABS.has(activeTab)) ? (
-            <PhaseProgressBar
-              activeTab={activeTab}
-              activeFlow={activeFlow}
-              onNavigate={(t) => {
-                if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
-                else { safeSetFlow(t.id); }
-              }}
-            />
-          ) : null}
+          {phaseBar}
           {activeFlow ? renderActiveFlow() : mainContent}
         </div>
         {/* Mobile bottom tabs for embedded mode — conditional render to avoid duplicate DOM */}
@@ -627,33 +653,10 @@ const Index = ({ initialTab }: IndexProps = {}) => {
             onFlowChange={(flow) => safeSetFlow(flow)}
           >
             <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-0">
-              <NotificationBell
-                notifications={notifications}
-                unreadCount={unreadCount}
-                onMarkRead={markRead}
-                onMarkAllRead={markAllRead}
-                onDismiss={dismiss}
-                onNavigate={(link) => {
-                  if (isFlowKey(link)) {
-                    setActiveFlow(link);
-                  } else {
-                    setActiveFlow(null);
-                    setActiveTab(link);
-                  }
-                }}
-              />
+              {notificationBell}
               <StoreModePill mode={mode} onOpenAccount={() => setActiveTab("account")} />
             </div>
-            {(activeFlow && INVOICE_PHASE_FLOWS.has(activeFlow as string)) || (!activeFlow && PHASE_TABS.has(activeTab)) ? (
-              <PhaseProgressBar
-                activeTab={activeTab}
-                activeFlow={activeFlow}
-                onNavigate={(t) => {
-                  if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
-                  else { safeSetFlow(t.id); }
-                }}
-              />
-            ) : null}
+            {phaseBar}
             <QuickActionsBar onAction={handleStartFlow} />
             {activeFlow ? renderActiveFlow() : mainContent}
           </StockyLayout>
@@ -664,33 +667,10 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       {!isDesktop && (
         <div className="pb-24">
           <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-0">
-            <NotificationBell
-              notifications={notifications}
-              unreadCount={unreadCount}
-              onMarkRead={markRead}
-              onMarkAllRead={markAllRead}
-              onDismiss={dismiss}
-              onNavigate={(link) => {
-                if (isFlowKey(link)) {
-                  setActiveFlow(link);
-                } else {
-                  setActiveFlow(null);
-                  setActiveTab(link);
-                }
-              }}
-            />
-            <StoreModePill mode={mode} onOpenAccount={() => setActiveTab("account")} />
-          </div>
-          {(activeFlow && INVOICE_PHASE_FLOWS.has(activeFlow as string)) || (!activeFlow && PHASE_TABS.has(activeTab)) ? (
-            <PhaseProgressBar
-              activeTab={activeTab}
-              activeFlow={activeFlow}
-              onNavigate={(t) => {
-                if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
-                else { safeSetFlow(t.id); }
-              }}
-            />
-          ) : null}
+              {notificationBell}
+              <StoreModePill mode={mode} onOpenAccount={() => setActiveTab("account")} />
+            </div>
+            {phaseBar}
           <QuickActionsBar onAction={handleStartFlow} />
           {activeFlow ? renderActiveFlow() : mainContent}
           <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />

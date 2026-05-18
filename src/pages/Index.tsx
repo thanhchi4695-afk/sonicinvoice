@@ -61,6 +61,14 @@ export interface FlowParams {
   [key: string]: unknown;
 }
 
+// Reconciliation payload stashed by InvoiceFlow before navigating to the review panel.
+// Shape is intentionally open — downstream consumers narrow as needed.
+export interface ReconciliationResult {
+  sets?: unknown[];
+  invoiceId?: string;
+  [key: string]: unknown;
+}
+
 // Consume one-shot flow params stashed on window by the navigate-flow event.
 // Reading clears the value so a later flow can't pick up stale data.
 const consumeFlowParams = (): FlowParams | undefined => {
@@ -68,9 +76,22 @@ const consumeFlowParams = (): FlowParams | undefined => {
   delete (window as unknown as { __sonicFlowParams?: FlowParams }).__sonicFlowParams;
   return p;
 };
-if (typeof window !== "undefined") {
-  (window as unknown as { __sonicConsumeFlowParams: () => FlowParams | undefined }).__sonicConsumeFlowParams = consumeFlowParams;
-}
+
+// Hoisted out of the component to avoid re-allocating a Set on every render.
+// Phase breadcrumb is only meaningful while inside the invoice pipeline.
+const INVOICE_PHASE_FLOWS: ReadonlySet<string> = new Set([
+  "invoice", "scan_mode", "packing_slip", "email_inbox", "joor",
+  "wholesale_import", "lookbook_import", "order_form",
+  "catalog_memory", "supplier_intelligence", "stock_check", "stock_reconciliation",
+  "product_descriptions", "image_optimise", "collection_seo",
+  "collab_seo", "organic_seo", "geo_agentic", "style_grouping", "csv_seo",
+  "price_adjust", "price_lookup", "price_match", "margin_protection",
+  "markdown_ladder", "competitor_intel", "sale",
+  "google_ads_setup", "meta_ads_setup", "feed_optimise", "feed_health",
+  "google_ads", "social_media", "lightspeed_convert",
+]);
+const PHASE_TABS: ReadonlySet<string> = new Set(["analytics"]);
+
 
 
 import { useStoreMode } from "@/hooks/use-store-mode";

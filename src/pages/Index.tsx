@@ -118,7 +118,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   const [useStockyDashboard, setUseStockyDashboard] = useState(() => localStorage.getItem("stocky_dashboard_mode") === "true");
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showQuickSearch, setShowQuickSearch] = useState(false);
-  const [reconciliationResult, setReconciliationResult] = useState<any>(null);
+  const [reconciliationResult, setReconciliationResult] = useState<ReconciliationResult | null>(null);
   const [historyPatternId, setHistoryPatternId] = useState<string | null>(null);
 
   const handleReconciliationExport = useCallback((_sets: unknown) => {

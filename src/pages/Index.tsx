@@ -183,22 +183,6 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   const { notifications, unreadCount, addNotification, markRead, markAllRead, dismiss } = useNotifications();
   const { isEmbedded, shop, authState: embeddedAuthState, authError: embeddedAuthError } = useShopifyEmbedded();
 
-  // Phase breadcrumb is only meaningful while the user is inside the invoice
-  // pipeline. On Inventory / Suppliers / Billing / Account etc. it creates a
-  // false signal that an invoice is "in progress". Hide it everywhere else.
-  const INVOICE_PHASE_FLOWS = new Set([
-    "invoice", "scan_mode", "packing_slip", "email_inbox", "joor",
-    "wholesale_import", "lookbook_import", "order_form",
-    "catalog_memory", "supplier_intelligence", "stock_check", "stock_reconciliation",
-    "product_descriptions", "image_optimise", "collection_seo",
-    "collab_seo", "organic_seo", "geo_agentic", "style_grouping", "csv_seo",
-    "price_adjust", "price_lookup", "price_match", "margin_protection",
-    "markdown_ladder", "competitor_intel", "sale",
-    "google_ads_setup", "meta_ads_setup", "feed_optimise", "feed_health",
-    "google_ads", "social_media", "lightspeed_convert",
-  ]);
-  const PHASE_TABS = new Set(["analytics"]);
-
   // ── Standalone session management (non-embedded only) ──
   // Embedded auth is handled entirely by ShopifyEmbeddedProvider.
   useEffect(() => {
@@ -207,6 +191,15 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       // No Supabase listener needed here — the provider already set the session.
       return;
     }
+
+    // Guard so the first responder (listener OR getSession) flips authLoading,
+    // and the slower one becomes a no-op — prevents a late flicker.
+    let loadingResolved = false;
+    const resolveLoading = () => {
+      if (loadingResolved) return;
+      loadingResolved = true;
+      setAuthLoading(false);
+    };
 
     // Set up auth state listener FIRST (standalone only)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -219,7 +212,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         localStorage.removeItem("onboarding_complete");
         setOnboarded(false);
       }
-      setAuthLoading(false);
+      resolveLoading();
     });
 
     // Then check for existing session
@@ -230,8 +223,9 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         localStorage.removeItem("onboarding_complete");
         setOnboarded(false);
       }
-      setAuthLoading(false);
+      resolveLoading();
     });
+
 
     return () => subscription.unsubscribe();
   }, [isEmbedded]);

@@ -626,32 +626,9 @@ const Index = ({ initialTab }: IndexProps = {}) => {
                 ← Back
               </button>
             )}
-            <NotificationBell
-              notifications={notifications}
-              unreadCount={unreadCount}
-              onMarkRead={markRead}
-              onMarkAllRead={markAllRead}
-              onDismiss={dismiss}
-              onNavigate={(link) => {
-                if (isFlowKey(link)) {
-                  setActiveFlow(link);
-                } else {
-                  setActiveFlow(null);
-                  setActiveTab(link);
-                }
-              }}
-            />
+            {notificationBell}
           </div>
-          {(activeFlow && INVOICE_PHASE_FLOWS.has(activeFlow as string)) || (!activeFlow && PHASE_TABS.has(activeTab)) ? (
-            <PhaseProgressBar
-              activeTab={activeTab}
-              activeFlow={activeFlow}
-              onNavigate={(t) => {
-                if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
-                else { safeSetFlow(t.id); }
-              }}
-            />
-          ) : null}
+          {phaseBar}
           {activeFlow ? renderActiveFlow() : mainContent}
         </div>
         {/* Mobile bottom tabs for embedded mode — conditional render to avoid duplicate DOM */}

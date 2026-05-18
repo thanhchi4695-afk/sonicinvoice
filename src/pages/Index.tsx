@@ -461,6 +461,42 @@ const Index = ({ initialTab }: IndexProps = {}) => {
     );
   }
 
+  // Shared header element — single source of truth for the notification bell so
+  // the three layout branches (embedded / desktop / mobile) can't drift apart
+  // or accidentally double-mount it on tablet at the 1024px boundary.
+  const notificationBell = (
+    <NotificationBell
+      notifications={notifications}
+      unreadCount={unreadCount}
+      onMarkRead={markRead}
+      onMarkAllRead={markAllRead}
+      onDismiss={dismiss}
+      onNavigate={(link) => {
+        if (isFlowKey(link)) {
+          setActiveFlow(link);
+        } else {
+          setActiveFlow(null);
+          setActiveTab(link);
+        }
+      }}
+    />
+  );
+
+  // Shared phase breadcrumb — rendered only while inside an invoice-pipeline
+  // flow (or analytics tab). Extracted so all three layouts stay in sync.
+  const phaseBar =
+    (activeFlow && INVOICE_PHASE_FLOWS.has(activeFlow as string)) ||
+    (!activeFlow && PHASE_TABS.has(activeTab)) ? (
+      <PhaseProgressBar
+        activeTab={activeTab}
+        activeFlow={activeFlow}
+        onNavigate={(t) => {
+          if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
+          else { safeSetFlow(t.id); }
+        }}
+      />
+    ) : null;
+
   const mainContent = (
     <>
       {(activeTab === "home" || activeTab === "start") && (

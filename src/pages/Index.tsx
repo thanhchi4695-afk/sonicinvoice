@@ -690,33 +690,10 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       {!isDesktop && (
         <div className="pb-24">
           <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-0">
-            <NotificationBell
-              notifications={notifications}
-              unreadCount={unreadCount}
-              onMarkRead={markRead}
-              onMarkAllRead={markAllRead}
-              onDismiss={dismiss}
-              onNavigate={(link) => {
-                if (isFlowKey(link)) {
-                  setActiveFlow(link);
-                } else {
-                  setActiveFlow(null);
-                  setActiveTab(link);
-                }
-              }}
-            />
-            <StoreModePill mode={mode} onOpenAccount={() => setActiveTab("account")} />
-          </div>
-          {(activeFlow && INVOICE_PHASE_FLOWS.has(activeFlow as string)) || (!activeFlow && PHASE_TABS.has(activeTab)) ? (
-            <PhaseProgressBar
-              activeTab={activeTab}
-              activeFlow={activeFlow}
-              onNavigate={(t) => {
-                if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
-                else { safeSetFlow(t.id); }
-              }}
-            />
-          ) : null}
+              {notificationBell}
+              <StoreModePill mode={mode} onOpenAccount={() => setActiveTab("account")} />
+            </div>
+            {phaseBar}
           <QuickActionsBar onAction={handleStartFlow} />
           {activeFlow ? renderActiveFlow() : mainContent}
           <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />

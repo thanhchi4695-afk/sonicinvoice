@@ -558,11 +558,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         )}
         {activeTab === "analytics" && <AnalyticsPanel />}
         {activeTab === "history" && <HistoryScreen />}
-        {activeTab === "flywheel" && (
-          <Suspense fallback={suspenseFallback}>
-            <FlywheelDashboard />
-          </Suspense>
-        )}
+        {activeTab === "flywheel" && <FlywheelDashboard />}
         {activeTab === "tools" && <ToolsScreen onStartFlow={handleStartFlow} />}
         {activeTab === "guide" && <HowToCatalog onNavigateToFeature={(f) => safeSetFlow(f)} onNavigateToTab={(t) => { setActiveFlow(null); setActiveTab(t); }} />}
         {activeTab === "google_ads" && <AdsGuideTabs />}

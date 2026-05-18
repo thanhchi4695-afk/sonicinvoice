@@ -164,6 +164,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
     };
     const onQuickSearch = () => setShowQuickSearch(true);
     (window as unknown as { __sonicOpenQuickSearch?: () => void }).__sonicOpenQuickSearch = () => setShowQuickSearch(true);
+    (window as unknown as { __sonicConsumeFlowParams?: () => FlowParams | undefined }).__sonicConsumeFlowParams = consumeFlowParams;
     window.addEventListener("sonic:reconciliation-ready", onReady as EventListener);
     window.addEventListener("sonic:navigate-flow", onNavFlow as EventListener);
     window.addEventListener("sonic:navigate-tab", onNavTab as EventListener);
@@ -174,6 +175,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       window.removeEventListener("sonic:navigate-tab", onNavTab as EventListener);
       window.removeEventListener("sonic:open-quick-search", onQuickSearch);
       delete (window as unknown as { __sonicOpenQuickSearch?: () => void }).__sonicOpenQuickSearch;
+      delete (window as unknown as { __sonicConsumeFlowParams?: () => FlowParams | undefined }).__sonicConsumeFlowParams;
     };
   }, []);
   
